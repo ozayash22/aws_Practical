@@ -2,32 +2,45 @@ pipeline {
     agent any
 
     stages {
-        stage('Clone Repository') {
+        stage('Checkout') {
             steps {
-                git branch: 'master', url: 'https://github.com/ozayash22/aws_Practical.git'
+                git url: 'https://github.com/ozayash22/aws_Practical.git', credentialsId: 'github-credentials'
             }
         }
 
         stage('Build') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh '''
+                javac HelloJenkins.java
+                '''
+            }
+        }
+
+        stage('Run') {
+            steps {
+                sh '''
+                java HelloJenkins
+                '''
             }
         }
 
         stage('Deploy') {
             steps {
+                echo 'Deploying to /var/www/html'
                 sh '''
-                # Stop any existing app
-                pkill -f myapp.jar || true
-
-                # Copy the new jar to /opt/app
-                sudo mkdir -p /opt/app
-                sudo cp target/myapp.jar /opt/app/
-
-                # Run the jar in background
-                nohup java -jar /opt/app/myapp.jar > /opt/app/app.log 2>&1 &
+                sudo rm -rf /var/www/html/*
+                sudo cp HelloJenkins.java /var/www/html/
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Build and Deploy successful!'
+        }
+        failure {
+            echo 'Build or Deploy failed.'
         }
     }
 }
