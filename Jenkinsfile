@@ -1,53 +1,33 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    WEBROOT = '/var/www/html'
-  }
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', url: 'https://github.com/<your-username>/<your-repo>.git'
+            }
+        }
 
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
+        stage('Build') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
 
-    stage('Build (optional)') {
-      steps {
-        // If you have build steps (npm build etc.), add them here. For static site, skip
-        sh '''
-        if [ -f package.json ]; then
-          npm install
-          npm run build || true
-        fi
-        '''
-      }
-    }
+        stage('Deploy') {
+            steps {
+                sh '''
+                # Stop any existing app
+                pkill -f myapp.jar || true
 
-    stage('Deploy') {
-      steps {
-        // Use sudo cp -> requires jenkins passwordless sudo configured earlier
-        sh '''
-        echo "Deploying to ${WEBROOT}"
-        # remove old contents (be careful)
-        sudo rm -rf ${WEBROOT}/*
-        # copy repo files to webroot (exclude .git)
-        sudo cp -r `pwd`/* ${WEBROOT}/
-        # fix ownership (optional)
-        sudo chown -R nginx:nginx ${WEBROOT} || sudo chown -R ec2-user:ec2-user ${WEBROOT} || true
-        # restart nginx
-        sudo systemctl restart nginx
-        '''
-      }
-    }
-  }
+                # Copy the new jar to /opt/app
+                sudo mkdir -p /opt/app
+                sudo cp target/myapp.jar /opt/app/
 
-  post {
-    success {
-      echo "Deployment successful"
+                # Run the jar in background
+                nohup java -jar /opt/app/myapp.jar > /opt/app/app.log 2>&1 &
+                '''
+            }
+        }
     }
-    failure {
-      echo "Deployment failed"
-    }
-  }
 }
